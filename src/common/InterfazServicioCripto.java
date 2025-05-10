@@ -1,0 +1,73 @@
+package common;
+
+import java.rmi.Remote;
+import java.rmi.RemoteException;
+import java.util.List;
+import java.util.Map;
+/*
+* ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⡤⠤⣤⢼⣩⡥⡤⣤⠤⢄⡀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠠⣔⠊⡱⠁⢀⠎⠀⠀⠀⠑⡄⠀⠉⢆⡈⠢⢄⡀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⡔⣽⣁⣀⣸⠀⠀⠀⠀⡰⠣⣀⣀⣈⡎⠉⠣⡀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⡜⠀⢀⠀⠀⠀⢇⡠⠔⠋⠀⠀⠀⠀⠀⠀⡀⠀⢣⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⡇⠀⠑⠀⠀⡠⠀⠁⠀⣄⠀⠀⢠⠄⠀⠈⠊⠀⢸⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⢣⠀⠀⣄⠀⠈⠀⠀⠀⠉⠀⠀⠀⠁⠀⣄⠀⠀⡜⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠈⢆⠀⠉⠀⠀⠐⠅⠀⠀⠀⠪⠂⠀⠀⠉⠀⡰⠁⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠈⢆⠀⠸⠇⠀⠀⠀⣶⠀⠀⠀⠸⠃⠀⡰⠁⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢢⡀⠀⢠⡆⠀⠀⠀⢐⠄⠀⠀⡜⠁⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⣦⠀⠀⠀⢠⠊⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⠦⣀⣀⣀⡠⠒⠁⠀⠀⠀⠀⠀⠀⠀⠀
+* */
+
+public interface InterfazServicioCripto extends Remote {
+    /**
+     * Permite a un usuario establecer una nueva alerta de precio para una criptomoneda.
+     *
+     * @param idUsuario      Identificador único del usuario que establece la alerta.
+     * @param criptomoneda   Símbolo de la criptomoneda (ej. "BTC", "ETH").
+     * @param precioUmbral   El precio que, al ser alcanzado, disparará la alerta.
+     * @param tipoCondicion  Indica si la alerta se dispara cuando el precio es "MAYOR_QUE" o "MENOR_QUE" el umbral.
+     * @return Un mensaje de confirmación o error.
+     * @throws RemoteException Si ocurre un error durante la comunicación RMI.
+     */
+    String establecerAlerta(String idUsuario, String criptomoneda, double precioUmbral, String tipoCondicion) throws RemoteException;
+
+    /**
+     * Recupera la lista de alertas activas para un usuario específico.
+     * Por ahora, cada alerta se representará como un String descriptivo.
+     *
+     * @param idUsuario Identificador único del usuario.
+     * @return Una lista de Strings, donde cada String describe una alerta (ej. "BTC > 70000 USD").
+     * @throws RemoteException Si ocurre un error durante la comunicación RMI.
+     */
+    List <String> obtenerAlertasUsuario(String idUsuario) throws RemoteException;
+
+    /**
+     * Obtiene el precio actual de una criptomoneda específica.
+     *
+     * @param criptomoneda Símbolo de la criptomoneda (ej. "BTC", "ETH").
+     * @return El precio actual de la criptomoneda en USD, o un valor negativo/especial si no se encuentra.
+     * @throws RemoteException Si ocurre un error durante la comunicación RMI.
+     */
+    double obtenerPrecioActual(String criptomoneda) throws RemoteException;
+
+    /**
+     * Obtiene un mapa con los precios actuales de un conjunto de criptomonedas monitoreadas.
+     * Para la entrega parcial, podría devolver los precios de todas las monedas que el servidor
+     * esté siguiendo internamente.
+     *
+     * @param idUsuario (Opcional por ahora, podría usarse en el futuro para personalizar qué monedas se devuelven
+     * o simplemente para logging).
+     * @return Un Map donde la clave es el símbolo de la criptomoneda (String) y el valor es su precio actual (Double).
+     * @throws RemoteException Si ocurre un error durante la comunicación RMI.
+     */
+    Map<String, Double> obtenerPreciosMonitoreados(String idUsuario) throws RemoteException;
+}
+
+
+
+
+
+
+
+
+
