@@ -1,0 +1,1 @@
+# Proyecto computación paralela y distribuida 2025
