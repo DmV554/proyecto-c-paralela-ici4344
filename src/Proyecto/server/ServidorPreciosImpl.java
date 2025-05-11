@@ -1,13 +1,10 @@
 package server;
 import common.InterfazServicioCripto;
-import common.Persona; //????
 
-
+import java.io.IOException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -17,27 +14,44 @@ import java.util.stream.Collectors;
 
 public class ServidorPreciosImpl extends UnicastRemoteObject implements InterfazServicioCripto {
 
-    // Caché para almacenar los precios de las criptomonedas (Símbolo -> Precio)
+    private final CoinGeckoService coinGeckoService;
+    private final Set<String> criptosMonitoreadasActivamente;
+    private static final String MONEDA_COTIZACION = "usd";
+    private static final int INTERVALO_ACTUALIZACION_PRECIOS_SEGUNDOS = 5;
+    private static final int INTERVALO_VERIFICACION_ALERTAS_SEGUNDOS = 5;
+    private static final int DELAY_INICIAL_VERIFICACION_ALERTAS_SEGUNDOS = 5;
+
+    // Constructor
+    public ServidorPreciosImpl() throws RemoteException {
+        super();
+        this.coinGeckoService = new CoinGeckoService();
+
+        this.criptosMonitoreadasActivamente = Collections.unmodifiableSet(
+                new HashSet<>(Arrays.asList("BTC", "ETH", "ADA", "SOL"))
+        );
+
+        System.out.println("ServidorPreciosImpl instanciado.");
+        System.out.println("Criptomonedas monitoreadas activamente: " + criptosMonitoreadasActivamente);
+
+        iniciarActualizadorDePreciosDesdeAPI();
+        iniciarVerificadorDeAlertas();
+
+    }
+
     private final Map<String, Double> cachePrecios = new ConcurrentHashMap<>();
 
-    // Estructura para almacenar las alertas definidas por los usuarios
-    // (idUsuario -> Lista de sus alertas)
     private final Map<String, List<AlertaDefinicion>> alertasPorUsuario = new ConcurrentHashMap<>();
 
-    // Clase interna para representar la definición de una alerta.
-    // No necesita ser Serializable si solo se usa dentro del servidor
-    // y no se envía directamente al cliente como un objeto AlertaDefinicion.
-    // Si el método obtenerAlertasUsuario devolviera List<AlertaDefinicion>, entonces sí debería ser Serializable.
     private static class AlertaDefinicion {
         String idUsuario;
         String criptomoneda; // Ej. "BTC", "ETH"
         double precioUmbral;
         String tipoCondicion; // "MAYOR_QUE" o "MENOR_QUE"
-        boolean activa = true; // Para controlar si la alerta ya se notificó (opcional)
+        boolean activa = true; // Para controlar si la alerta ya se notific
 
         public AlertaDefinicion(String idUsuario, String criptomoneda, double precioUmbral, String tipoCondicion) {
             this.idUsuario = idUsuario;
-            this.criptomoneda = criptomoneda.toUpperCase(); // Normalizar a mayúsculas
+            this.criptomoneda = criptomoneda.toUpperCase();
             this.precioUmbral = precioUmbral;
             this.tipoCondicion = tipoCondicion;
         }
@@ -50,13 +64,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
         }
     }
 
-    // Constructor
-    public ServidorPreciosImpl() throws RemoteException {
-        super(); // Necesario para UnicastRemoteObject
-        System.out.println("ServidorPreciosImpl instanciado.");
-        iniciarActualizadorDePreciosSimulado(); // Inicia la tarea de actualización de precios
-        iniciarVerificadorDeAlertas();      // Inicia la tarea de verificación de alertas
-    }
+
 /*⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⣤⣤⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⠋⠀⠀⠙⢿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⣸⡇⠀⠀⠀⠀⠀⠙⢿⣦⡀⠀⠀⢀⣀⣀⣠⣤⣀⠀⠀
@@ -76,30 +84,45 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
 *
 *
 * */
-    // Tarea programada para simular la actualización de precios AQUÍ HAY QUE VER BIEN QUE QUEREMOS HACER CHIQUILLOS
-    private void iniciarActualizadorDePreciosSimulado() {
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        scheduler.scheduleAtFixedRate(() -> {
-            // Simulación de obtención de precios
-            cachePrecios.put("BTC", 50000.0 + (Math.random() * 5000 - 2500)); // BTC entre 47500 y 52500
-            cachePrecios.put("ETH", 3000.0 + (Math.random() * 500 - 250));   // ETH entre 2750 y 3250
-            cachePrecios.put("ADA", 1.0 + (Math.random() * 0.5 - 0.25));     // ADA entre 0.75 y 1.25
-            // System.out.println("[Servidor DEBUG] Precios simulados actualizados: " + cachePrecios);
-        }, 0, 10, TimeUnit.SECONDS); // Actualiza cada 10 segundos (ajusta según necesidad)
-        System.out.println("Tarea de actualización de precios simulados iniciada.");
-    }
+private void iniciarActualizadorDePreciosDesdeAPI() {
+    ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    scheduler.scheduleAtFixedRate(() -> {
+        if (criptosMonitoreadasActivamente.isEmpty()) {
+            System.out.println("[Servidor DEBUG] No hay criptomonedas para actualizar desde la API.");
+            return;
+        }
+        try {
+            System.out.println("[Servidor] Actualizando precios desde CoinGecko para: " + criptosMonitoreadasActivamente);
+            Map<String, Double> nuevosPrecios = coinGeckoService.fetchPrices(criptosMonitoreadasActivamente, MONEDA_COTIZACION);
+
+            if (!nuevosPrecios.isEmpty()) {
+                nuevosPrecios.forEach(cachePrecios::put);
+                System.out.println("[Servidor] Precios actualizados desde CoinGecko: " + cachePrecios);
+            } else {
+                System.out.println("[Servidor] No se recibieron nuevos precios de CoinGecko para las criptomonedas monitoreadas.");
+            }
+
+        } catch (IOException e) {
+            System.err.println("[Servidor ERROR] No se pudo actualizar precios desde CoinGecko: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("[Servidor ERROR] Excepción inesperada durante actualización de precios: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }, 0, INTERVALO_ACTUALIZACION_PRECIOS_SEGUNDOS, TimeUnit.SECONDS); // Ajusta el intervalo según necesidad y límites de API
+    System.out.println("Tarea de actualización de precios desde API iniciada (cada " + INTERVALO_ACTUALIZACION_PRECIOS_SEGUNDOS + " segundos).");
+}
 
     // Tarea programada para verificar si alguna alerta se cumple
     private void iniciarVerificadorDeAlertas() {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         scheduler.scheduleAtFixedRate(() -> {
             if (alertasPorUsuario.isEmpty()) {
-                return; // No hay alertas que verificar
+                return;
             }
-            // System.out.println("[Servidor DEBUG] Verificando alertas...");
+
             alertasPorUsuario.forEach((idUsuario, listaDeAlertas) -> {
                 for (AlertaDefinicion alerta : listaDeAlertas) {
-                    if (!alerta.activa) continue; // Saltar alertas ya disparadas (si implementas esa lógica)
+                    if (!alerta.activa) continue;
 
                     Double precioActual = cachePrecios.get(alerta.criptomoneda);
                     if (precioActual != null) {
@@ -111,16 +134,13 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                         }
 
                         if (condicionCumplida) {
-                            System.out.printf("[ALERTA DISPARADA] Usuario: %s, Alerta: %s, Precio Actual de %s: %.2f USD\n",
-                                    idUsuario, alerta.toString(), alerta.criptomoneda, precioActual);
-                            // Opcional: Marcar la alerta como inactiva para que no se dispare repetidamente
-                            // alerta.activa = false;
-                            // Para la entrega parcial, imprimir en la consola del servidor es suficiente.
+                            System.out.printf("[ALERTA DISPARADA] Usuario: %s, Alerta: %s, Precio Actual de %s: %.2f %s\n",
+                                    idUsuario, alerta.toString(), alerta.criptomoneda, precioActual, MONEDA_COTIZACION.toUpperCase());
                         }
                     }
                 }
             });
-        }, 5, 15, TimeUnit.SECONDS); // Verifica cada 15 segundos, después de una posible actualización de precios
+        }, DELAY_INICIAL_VERIFICACION_ALERTAS_SEGUNDOS, INTERVALO_VERIFICACION_ALERTAS_SEGUNDOS, TimeUnit.SECONDS);
         System.out.println("Tarea de verificación de alertas iniciada.");
     }
 
@@ -132,12 +152,19 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                 (!tipoCondicion.equals("MAYOR_QUE") && !tipoCondicion.equals("MENOR_QUE"))) {
             throw new RemoteException("Datos de alerta inválidos: Usuario, criptomoneda y tipo de condición son obligatorios.");
         }
+        String criptoUpper = criptomoneda.toUpperCase();
 
-        AlertaDefinicion nuevaAlerta = new AlertaDefinicion(idUsuario, criptomoneda, precioUmbral, tipoCondicion);
+        // Advertencia opcional
+        if (!criptosMonitoreadasActivamente.contains(criptoUpper) &&
+                !CoinGeckoService.SYMBOL_TO_COINGECKO_ID_MAP.containsKey(criptoUpper)) {
+            System.out.printf("[Servidor WARN] Alerta para %s (%s) que no está en monitoreo activo ni tiene mapeo conocido en CoinGeckoService. El precio podría no obtenerse.\n", criptomoneda, criptoUpper);
+        }
+
+
+        AlertaDefinicion nuevaAlerta = new AlertaDefinicion(idUsuario, criptoUpper, precioUmbral, tipoCondicion);
         alertasPorUsuario.computeIfAbsent(idUsuario, k -> new ArrayList<>()).add(nuevaAlerta);
 
         System.out.printf("[Servidor] Alerta establecida para %s: %s\n", idUsuario, nuevaAlerta.toString());
-        // TODO: En una fase posterior, guardar en base de datos.
         return "Alerta para " + nuevaAlerta.toString() + " establecida correctamente para el usuario " + idUsuario + ".";
     }
 
@@ -150,7 +177,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
         // TODO: En una fase posterior, leer de base de datos.
         List<AlertaDefinicion> alertas = alertasPorUsuario.getOrDefault(idUsuario, new ArrayList<>());
         return alertas.stream()
-                .map(AlertaDefinicion::toString) // Convierte cada AlertaDefinicion a su representación String
+                .map(AlertaDefinicion::toString)
                 .collect(Collectors.toList());
     }
 
@@ -161,15 +188,32 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
         }
         String criptoUpper = criptomoneda.toUpperCase();
         System.out.println("[Servidor] Solicitud de precio para: " + criptoUpper);
-        // TODO: En una fase posterior, podría haber lógica para forzar actualización desde API si el precio es muy viejo.
-        return cachePrecios.getOrDefault(criptoUpper, -1.0); // Devuelve -1.0 si la cripto no está en el caché
+
+        Double precioEnCache = cachePrecios.get(criptoUpper);
+        if (precioEnCache != null) {
+            return precioEnCache;
+        } else {
+            System.out.println("[Servidor] Precio para " + criptoUpper + " no en caché. Intentando obtener desde API...");
+            try {
+                Double precioObtenido = coinGeckoService.fetchSinglePrice(criptoUpper, MONEDA_COTIZACION);
+                if (precioObtenido != null) {
+                    cachePrecios.put(criptoUpper, precioObtenido); // Guardar en caché para futuras solicitudes
+                    System.out.println("[Servidor] Precio para " + criptoUpper + " obtenido de API y cacheado: " + precioObtenido);
+                    return precioObtenido;
+                } else {
+                    System.out.println("[Servidor] No se pudo obtener precio para " + criptoUpper + " desde la API.");
+                    return -1.0;
+                }
+            } catch (IOException e) {
+                System.err.println("[Servidor ERROR] IOException al obtener precio individual para " + criptoUpper + ": " + e.getMessage());
+                return -1.0;
+            }
+        }
     }
 
     @Override
     public Map<String, Double> obtenerPreciosMonitoreados(String idUsuario) throws RemoteException {
-        // Por simplicidad, devolvemos todos los precios que el servidor tiene en caché.
-        // No usamos idUsuario aquí, pero podría usarse para personalización futura.
         System.out.println("[Servidor] Solicitud de precios monitoreados (devolviendo todos los precios en caché).");
-        return new ConcurrentHashMap<>(cachePrecios); // Devolver una copia para evitar problemas de concurrencia en el cliente
+        return new ConcurrentHashMap<>(cachePrecios);
     }
 }
