@@ -1,5 +1,5 @@
 package server; // O server.external
-
+/*
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
@@ -19,4 +19,4 @@ import java.util.stream.Collectors;
 
 public class CoinGeckoService {
 
-}
+}*/
