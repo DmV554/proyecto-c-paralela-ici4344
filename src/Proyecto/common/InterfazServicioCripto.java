@@ -51,9 +51,8 @@ public interface InterfazServicioCripto extends Remote {
     double obtenerPrecioActual(String criptomoneda) throws RemoteException;
 
     /**
-     * Obtiene un mapa con los precios actuales de un conjunto de criptomonedas monitoreadas.
-     * Para la entrega parcial, podría devolver los precios de todas las monedas que el servidor
-     * esté siguiendo internamente.
+     * Obtiene un mapa con los precios actuales de un conjunto de criptomonedas monitoreadas
+     * (generalmente aquellas en caché debido a búsquedas recientes o alertas activas).
      *
      * @param idUsuario (Opcional por ahora, podría usarse en el futuro para personalizar qué monedas se devuelven
      * o simplemente para logging).
@@ -61,13 +60,15 @@ public interface InterfazServicioCripto extends Remote {
      * @throws RemoteException Si ocurre un error durante la comunicación RMI.
      */
     Map<String, Double> obtenerPreciosMonitoreados(String idUsuario) throws RemoteException;
+
+    /**
+     * Obtiene un mapa con los precios actuales de todas las criptomonedas base definidas en el servidor.
+     * Esto puede implicar múltiples consultas a la API si no están en caché.
+     *
+     * @param idUsuario (Opcional, para logging o futuras personalizaciones).
+     * @return Un Map donde la clave es el símbolo de la criptomoneda (String) y el valor es su precio actual (Double).
+     * Puede contener valores negativos si algún precio no pudo ser obtenido.
+     * @throws RemoteException Si ocurre un error durante la comunicación RMI.
+     */
+    Map<String, Double> obtenerPreciosDeTodasLasBases(String idUsuario) throws RemoteException; // NUEVO MÉTODO
 }
-
-
-
-
-
-
-
-
-
