@@ -511,17 +511,17 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
             pstmt.setString(1, nombreUsuario);
             rs = pstmt.executeQuery();
             while (rs.next()) {
+                int idAlerta = rs.getInt("id_alerta");
+                String simbolo = rs.getString("simbolo").toUpperCase();
+                double precioUmbral = rs.getDouble("precio_umbral");
+                String tipoCondicion = rs.getString("tipo_condicion");
+                boolean activa = rs.getBoolean("activa");
 
-                AlertaDefinicion ad = new AlertaDefinicion(
-                        null,
-                        nombreUsuario,
-                        rs.getString("simbolo").toUpperCase(),
-                        rs.getDouble("precio_umbral"),
-                        rs.getString("tipo_condicion"),
-                        rs.getBoolean("activa")
-                );
-                alertasString.add(ad.toString());
-
+                String simboloCondicion = "MAYOR_QUE".equals(tipoCondicion) ? ">" : "<";
+                // Incluimos el ID de la alerta en el string
+                String descripcionAlerta = String.format("[ID: %d] %s %s %.2f (Activa: %b)",
+                        idAlerta, simbolo, simboloCondicion, precioUmbral, activa);
+                alertasString.add(descripcionAlerta);
             }
         } catch (SQLException e) {
             System.err.println("[Servidor ERROR] Error al obtener alertas para el usuario " + nombreUsuario + ": " + e.getMessage());
@@ -531,6 +531,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
         }
         return alertasString;
     }
+
 
     @Override
     public double obtenerPrecioActual(String criptomoneda) throws RemoteException {

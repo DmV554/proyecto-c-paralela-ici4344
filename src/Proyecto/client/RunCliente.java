@@ -57,15 +57,14 @@ public class RunCliente {
     private static void mostrarMenu() {
         // Usaremos los mismos colores y formato que tenías, adaptados al nuevo menú.
         System.out.println(ANSI_CYAN + "\n╔═══════════════ MENÚ PRINCIPAL ════════════════╗" + ANSI_RESET);
-
-        System.out.println("  1. Ver precios de criptomonedas (general)"); // NUEVO
-        System.out.println("  2. Ver precios de criptomonedas (buscadas anteriormente/cache)"); // MODIFICADO
+        System.out.println("  1. Ver precios de criptomonedas (general)");
+        System.out.println("  2. Ver precios de criptomonedas (buscadas anteriormente)");
         System.out.println("  3. Consultar precio específico");
         System.out.println("  4. Configurar nueva alerta de precio");
         System.out.println("  5. Ver mis alertas configuradas");
-        System.out.println("  6. Cambiar ID de usuario [actual: " + idUsuario + "]");
-        System.out.println("  7. Ayuda");
-
+        System.out.println("  6. Eliminar alerta configurada");
+        System.out.println("  7. Cambiar ID de usuario [actual: " + idUsuario + "]");
+        System.out.println("  8. Ayuda");
         System.out.println("  0. Salir");
         System.out.println(ANSI_CYAN + "╚═══════════════════════════════════════════════╝" + ANSI_RESET);
         System.out.print("Seleccione una opción: ");
@@ -89,7 +88,7 @@ public class RunCliente {
             case 0:
                 System.out.println(ANSI_YELLOW + "Cerrando aplicación..." + ANSI_RESET);
                 return false;
-uly
+
             case 1: // NUEVA OPCIÓN
                 verPreciosGenerales();
                 break;
@@ -106,12 +105,16 @@ uly
                 verAlertasConfiguradas();
                 break;
             case 6: // ANTERIOR OPCIÓN 5
-                cambiarIdUsuario();
+                eliminarAlertaUsuario();
                 break;
             case 7: // ANTERIOR OPCIÓN 6
 
+                cambiarIdUsuario();
+                break;
+            case 8: // Ayuda
                 mostrarAyuda();
                 break;
+
             default:
                 System.out.println(ANSI_RED + "Opción no válida. Intente nuevamente." + ANSI_RESET);
                 break;

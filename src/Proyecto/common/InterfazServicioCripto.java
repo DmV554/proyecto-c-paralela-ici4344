@@ -70,16 +70,6 @@ public interface InterfazServicioCripto extends Remote {
      * @throws RemoteException Si ocurre un error durante la comunicación RMI o en el servidor.
      */
     String eliminarAlerta(String idUsuario, int idAlertaDB) throws RemoteException;
-}
-
-
-
-
-
-
-
-
-
 
     /**
      * Obtiene un mapa con los precios actuales de todas las criptomonedas base definidas en el servidor.
