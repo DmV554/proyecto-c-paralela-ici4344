@@ -407,6 +407,87 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
     }
 
     @Override
+    public String eliminarAlerta(String nombreUsuario, int idAlertaDB) throws RemoteException {
+        if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
+            nombreUsuario = USUARIO_POR_DEFECTO;
+            System.out.println("[ServidorPreciosImpl] Nombre de usuario no provisto para eliminar alerta, usando por defecto: " + USUARIO_POR_DEFECTO);
+        }
+        if (idAlertaDB <= 0) {
+            throw new RemoteException("ID de alerta inválido.");
+        }
+
+        System.out.println("[ServidorPreciosImpl] Solicitud para eliminar alerta ID: " + idAlertaDB + " para el usuario: " + nombreUsuario);
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        int idUsuarioFk = -1;
+
+        try {
+            conn = DatabaseManager.getConnection();
+            conn.setAutoCommit(false); // Iniciar transacción
+
+            // 1. Obtener el id_usuario_fk del usuario
+            String sqlGetUsuario = "SELECT id_usuario FROM usuarios WHERE nombre_usuario = ?";
+            pstmt = conn.prepareStatement(sqlGetUsuario);
+            pstmt.setString(1, nombreUsuario);
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                idUsuarioFk = rs.getInt("id_usuario");
+            } else {
+                conn.rollback();
+                // Aunque podríamos crearlo, para eliminar una alerta el usuario ya debería existir y tener esa alerta.
+                throw new RemoteException("Usuario '" + nombreUsuario + "' no encontrado. No se puede eliminar la alerta.");
+            }
+            rs.close();
+            pstmt.close();
+
+            // 2. Eliminar la alerta verificando que pertenezca al usuario
+            String sqlDeleteAlerta = "DELETE FROM alertas WHERE id_alerta = ? AND id_usuario_fk = ?";
+            pstmt = conn.prepareStatement(sqlDeleteAlerta);
+            pstmt.setInt(1, idAlertaDB);
+            pstmt.setInt(2, idUsuarioFk);
+
+            int affectedRows = pstmt.executeUpdate();
+
+            if (affectedRows > 0) {
+                conn.commit();
+                String mensaje = "Alerta ID: " + idAlertaDB + " eliminada correctamente para el usuario " + nombreUsuario + ".";
+                System.out.println("[ServidorPreciosImpl] " + mensaje);
+                return mensaje;
+            } else {
+                conn.rollback();
+                // Verificar si la alerta existía pero no pertenecía al usuario, o si no existía.
+                String sqlCheckAlertaExiste = "SELECT id_usuario_fk FROM alertas WHERE id_alerta = ?";
+                PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheckAlertaExiste);
+                pstmtCheck.setInt(1, idAlertaDB);
+                ResultSet rsCheck = pstmtCheck.executeQuery();
+                boolean alertaExiste = rsCheck.next();
+                rsCheck.close();
+                pstmtCheck.close();
+
+                if (alertaExiste) {
+                    throw new RemoteException("La alerta ID: " + idAlertaDB + " no pertenece al usuario " + nombreUsuario + " o ya fue eliminada.");
+                } else {
+                    throw new RemoteException("Alerta ID: " + idAlertaDB + " no encontrada.");
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("[Servidor ERROR] SQLException al eliminar alerta: " + e.getMessage());
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                    System.err.println("[Servidor ERROR] Error en rollback al eliminar alerta: " + ex.getMessage());
+                }
+            }
+            throw new RemoteException("Error de base de datos al eliminar alerta: " + e.getMessage());
+        } finally {
+            DatabaseManager.close(conn, pstmt, rs); // rs ya estaría cerrado si se usó
+        }
+    }
+
+    @Override
     public List<String> obtenerAlertasUsuario(String nombreUsuario) throws RemoteException {
         if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
             nombreUsuario = USUARIO_POR_DEFECTO;
@@ -415,7 +496,8 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
         System.out.println("[ServidorPreciosImpl] Solicitud para obtener alertas del usuario: " + nombreUsuario);
 
         List<String> alertasString = new ArrayList<>();
-        String sql = "SELECT c.simbolo, a.precio_umbral, a.tipo_condicion, a.activa " +
+        // Modificamos la consulta SQL para obtener también a.id_alerta
+        String sql = "SELECT a.id_alerta, c.simbolo, a.precio_umbral, a.tipo_condicion, a.activa " +
                 "FROM alertas a " +
                 "JOIN usuarios u ON a.id_usuario_fk = u.id_usuario " +
                 "JOIN criptomonedas c ON a.id_cripto_fk = c.id_cripto " +
@@ -429,6 +511,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
             pstmt.setString(1, nombreUsuario);
             rs = pstmt.executeQuery();
             while (rs.next()) {
+
                 AlertaDefinicion ad = new AlertaDefinicion(
                         null,
                         nombreUsuario,
@@ -438,6 +521,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                         rs.getBoolean("activa")
                 );
                 alertasString.add(ad.toString());
+
             }
         } catch (SQLException e) {
             System.err.println("[Servidor ERROR] Error al obtener alertas para el usuario " + nombreUsuario + ": " + e.getMessage());

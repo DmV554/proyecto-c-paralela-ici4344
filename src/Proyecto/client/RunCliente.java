@@ -55,7 +55,9 @@ public class RunCliente {
     }
 
     private static void mostrarMenu() {
+        // Usaremos los mismos colores y formato que tenías, adaptados al nuevo menú.
         System.out.println(ANSI_CYAN + "\n╔═══════════════ MENÚ PRINCIPAL ════════════════╗" + ANSI_RESET);
+
         System.out.println("  1. Ver precios de criptomonedas (general)"); // NUEVO
         System.out.println("  2. Ver precios de criptomonedas (buscadas anteriormente/cache)"); // MODIFICADO
         System.out.println("  3. Consultar precio específico");
@@ -63,6 +65,7 @@ public class RunCliente {
         System.out.println("  5. Ver mis alertas configuradas");
         System.out.println("  6. Cambiar ID de usuario [actual: " + idUsuario + "]");
         System.out.println("  7. Ayuda");
+
         System.out.println("  0. Salir");
         System.out.println(ANSI_CYAN + "╚═══════════════════════════════════════════════╝" + ANSI_RESET);
         System.out.print("Seleccione una opción: ");
@@ -86,6 +89,7 @@ public class RunCliente {
             case 0:
                 System.out.println(ANSI_YELLOW + "Cerrando aplicación..." + ANSI_RESET);
                 return false;
+uly
             case 1: // NUEVA OPCIÓN
                 verPreciosGenerales();
                 break;
@@ -105,6 +109,7 @@ public class RunCliente {
                 cambiarIdUsuario();
                 break;
             case 7: // ANTERIOR OPCIÓN 6
+
                 mostrarAyuda();
                 break;
             default:
@@ -206,6 +211,57 @@ public class RunCliente {
         }
     }
 
+
+    /**
+     * Permite al usuario eliminar una de sus alertas configuradas.
+     */
+    private static void eliminarAlertaUsuario() {
+        System.out.println(ANSI_CYAN + "\n[ELIMINAR ALERTA CONFIGURADA]" + ANSI_RESET);
+
+        try {
+            // Primero, obtenemos las alertas para verificar si existen
+            String alertasActualesStr = controlador.obtenerAlertasUsuario();
+
+            // Imprimimos el resultado (sea la lista de alertas o el mensaje de "no hay alertas")
+            System.out.println(alertasActualesStr);
+
+            // Verificamos si el mensaje indica que no hay alertas
+            // Esta comparación es sensible al texto exacto devuelto por TerminalCliente.java
+            if ("No tienes alertas configuradas.".equals(alertasActualesStr.trim())) {
+                // Si no hay alertas, no pedimos ID y terminamos aquí.
+                return;
+            }
+
+            // Si llegamos aquí, significa que hay alertas y se mostraron.
+            // Ahora pedimos el ID.
+            System.out.print("Ingrese el ID de la alerta que desea eliminar (ej. 123): ");
+            String idStr = scanner.nextLine().trim();
+            int idAlertaAEliminar;
+
+            try {
+                idAlertaAEliminar = Integer.parseInt(idStr);
+            } catch (NumberFormatException e) {
+                System.out.println(ANSI_RED + "El ID de la alerta debe ser un número válido." + ANSI_RESET);
+                return;
+            }
+
+            if (idAlertaAEliminar <= 0) {
+                System.out.println(ANSI_RED + "El ID de la alerta debe ser un número positivo." + ANSI_RESET);
+                return;
+            }
+
+            // Llamar al controlador para eliminar la alerta
+            String resultadoEliminacion = controlador.eliminarAlerta(idAlertaAEliminar);
+            System.out.println(ANSI_GREEN + resultadoEliminacion + ANSI_RESET);
+
+        } catch (Exception e) {
+            System.out.println(ANSI_RED + "Error al procesar la eliminación de la alerta: " + e.getMessage() + ANSI_RESET);
+        }
+    }
+
+    /**
+     * Cambia el ID de usuario
+     */
     private static void cambiarIdUsuario() {
         System.out.println(ANSI_CYAN + "\n[CAMBIO DE ID DE USUARIO]" + ANSI_RESET);
         System.out.println("ID actual: " + idUsuario);
