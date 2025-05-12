@@ -151,6 +151,20 @@ public class TerminalCliente {
      *
      * @throws Exception Si no hay conexión establecida
      */
+
+    /**
+     * Solicita al servidor eliminar una alerta específica.
+     *
+     * @param idAlertaDB El ID de la alerta en la base de datos a eliminar.
+     * @return Mensaje de confirmación o error del servidor.
+     * @throws Exception Si ocurre un error al comunicarse con el servidor.
+     */
+    public String eliminarAlerta(int idAlertaDB) throws Exception {
+        verificarConexion();
+        return servicio.eliminarAlerta(idUsuario, idAlertaDB);
+    }
+
+
     private void verificarConexion() throws Exception {
         if (!conectado || servicio == null) {
             throw new Exception("No hay conexión con el servidor.");

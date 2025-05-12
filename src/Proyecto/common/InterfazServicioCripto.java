@@ -61,6 +61,16 @@ public interface InterfazServicioCripto extends Remote {
      * @throws RemoteException Si ocurre un error durante la comunicación RMI.
      */
     Map<String, Double> obtenerPreciosMonitoreados(String idUsuario) throws RemoteException;
+
+    /**
+     * Elimina una alerta específica de un usuario.
+     *
+     * @param idUsuario Identificador único del usuario propietario de la alerta.
+     * @param idAlertaDB El ID único de la alerta en la base de datos (obtenido de la tabla 'alertas').
+     * @return Un mensaje de confirmación o error.
+     * @throws RemoteException Si ocurre un error durante la comunicación RMI o en el servidor.
+     */
+    String eliminarAlerta(String idUsuario, int idAlertaDB) throws RemoteException;
 }
 
 

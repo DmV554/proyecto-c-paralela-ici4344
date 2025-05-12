@@ -76,13 +76,16 @@ public class RunCliente {
      * Muestra el menú principal de opciones
      */
     private static void mostrarMenu() {
+        // Usaremos los mismos colores y formato que tenías, adaptados al nuevo menú.
         System.out.println(ANSI_CYAN + "\n╔═══════════════ MENÚ PRINCIPAL ════════════════╗" + ANSI_RESET);
-        System.out.println("  1. Ver precios actuales de criptomonedas");
-        System.out.println("  2. Consultar precio específico");
-        System.out.println("  3. Configurar nueva alerta de precio");
-        System.out.println("  4. Ver mis alertas configuradas");
-        System.out.println("  5. Cambiar ID de usuario [actual: " + idUsuario + "]");
-        System.out.println("  6. Ayuda");
+        System.out.println("  1. Ver precios de criptomonedas (general)");
+        System.out.println("  2. Ver precios de criptomonedas (buscadas anteriormente)");
+        System.out.println("  3. Consultar precio específico");
+        System.out.println("  4. Configurar nueva alerta de precio");
+        System.out.println("  5. Ver mis alertas configuradas");
+        System.out.println("  6. Eliminar alerta configurada");
+        System.out.println("  7. Cambiar ID de usuario [actual: " + idUsuario + "]");
+        System.out.println("  8. Ayuda");
         System.out.println("  0. Salir");
         System.out.println(ANSI_CYAN + "╚═══════════════════════════════════════════════╝" + ANSI_RESET);
         System.out.print("Seleccione una opción: ");
@@ -114,27 +117,37 @@ public class RunCliente {
                 System.out.println(ANSI_YELLOW + "Cerrando aplicación..." + ANSI_RESET);
                 return false;
 
-            case 1: // Ver todos los precios
-                verPreciosActuales();
+            case 1: // Ver precios de criptomonedas (general) - NO IMPLEMENTADA AÚN
+                System.out.println(ANSI_YELLOW + "[INFO] Opción 1: 'Ver precios de criptomonedas (general)' aún no implementada." + ANSI_RESET);
+                // Aquí iría la llamada al método cuando esté implementado.
+                // Ejemplo: verPreciosGeneral();
                 break;
 
-            case 2: // Consultar precio específico
+            case 2: // Ver precios de criptomonedas (buscadas anteriormente) -> Tu antigua opción 1
+                verPreciosActuales(); // Esta era tu función para la opción 1 original
+                break;
+
+            case 3: // Consultar precio específico -> Tu antigua opción 2
                 consultarPrecioEspecifico();
                 break;
 
-            case 3: // Configurar alerta
+            case 4: // Configurar alerta -> Tu antigua opción 3
                 configurarAlerta();
                 break;
 
-            case 4: // Ver alertas
+            case 5: // Ver alertas -> Tu antigua opción 4
                 verAlertasConfiguradas();
                 break;
 
-            case 5: // Cambiar ID de usuario
+            case 6: // Eliminar alerta -> Tu antigua opción 5 (la que implementamos recientemente)
+                eliminarAlertaUsuario();
+                break;
+
+            case 7: // Cambiar ID de usuario -> Tu antigua opción 6 (o 5 antes de eliminar alerta)
                 cambiarIdUsuario();
                 break;
 
-            case 6: // Ayuda
+            case 8: // Ayuda -> Tu antigua opción 7 (o 6 antes de eliminar alerta)
                 mostrarAyuda();
                 break;
 
@@ -249,6 +262,53 @@ public class RunCliente {
             System.out.println(resultado);
         } catch (Exception e) {
             System.out.println(ANSI_RED + "Error al obtener alertas: " + e.getMessage() + ANSI_RESET);
+        }
+    }
+
+    /**
+     * Permite al usuario eliminar una de sus alertas configuradas.
+     */
+    private static void eliminarAlertaUsuario() {
+        System.out.println(ANSI_CYAN + "\n[ELIMINAR ALERTA CONFIGURADA]" + ANSI_RESET);
+
+        try {
+            // Primero, obtenemos las alertas para verificar si existen
+            String alertasActualesStr = controlador.obtenerAlertasUsuario();
+
+            // Imprimimos el resultado (sea la lista de alertas o el mensaje de "no hay alertas")
+            System.out.println(alertasActualesStr);
+
+            // Verificamos si el mensaje indica que no hay alertas
+            // Esta comparación es sensible al texto exacto devuelto por TerminalCliente.java
+            if ("No tienes alertas configuradas.".equals(alertasActualesStr.trim())) {
+                // Si no hay alertas, no pedimos ID y terminamos aquí.
+                return;
+            }
+
+            // Si llegamos aquí, significa que hay alertas y se mostraron.
+            // Ahora pedimos el ID.
+            System.out.print("Ingrese el ID de la alerta que desea eliminar (ej. 123): ");
+            String idStr = scanner.nextLine().trim();
+            int idAlertaAEliminar;
+
+            try {
+                idAlertaAEliminar = Integer.parseInt(idStr);
+            } catch (NumberFormatException e) {
+                System.out.println(ANSI_RED + "El ID de la alerta debe ser un número válido." + ANSI_RESET);
+                return;
+            }
+
+            if (idAlertaAEliminar <= 0) {
+                System.out.println(ANSI_RED + "El ID de la alerta debe ser un número positivo." + ANSI_RESET);
+                return;
+            }
+
+            // Llamar al controlador para eliminar la alerta
+            String resultadoEliminacion = controlador.eliminarAlerta(idAlertaAEliminar);
+            System.out.println(ANSI_GREEN + resultadoEliminacion + ANSI_RESET);
+
+        } catch (Exception e) {
+            System.out.println(ANSI_RED + "Error al procesar la eliminación de la alerta: " + e.getMessage() + ANSI_RESET);
         }
     }
 

@@ -12,8 +12,8 @@ public class DatabaseManager {
 
     // --- Configuración de la Base de Datos ---
     private static final String DB_URL = "jdbc:mysql://localhost:3306/cripto_monitor_db";
-    private static final String DB_USER = "daniel";
-    private static final String DB_PASSWORD = "1234";
+    private static final String DB_USER = "root";
+    private static final String DB_PASSWORD = "";
 
     static {
         try {
