@@ -63,8 +63,9 @@ public class RunCliente {
         System.out.println("  4. Configurar nueva alerta de precio");
         System.out.println("  5. Ver mis alertas configuradas");
         System.out.println("  6. Eliminar alerta configurada");
-        System.out.println("  7. Cambiar ID de usuario [actual: " + idUsuario + "]");
-        System.out.println("  8. Ayuda");
+        System.out.println("  7. Modificar alerta configurada"); // <-- NUEVA LÍNEA
+        System.out.println("  8. Cambiar ID de usuario [actual: " + idUsuario + "]");
+        System.out.println("  9. Ayuda"); // <-- Ajustar numeración
         System.out.println("  0. Salir");
         System.out.println(ANSI_CYAN + "╚═══════════════════════════════════════════════╝" + ANSI_RESET);
         System.out.print("Seleccione una opción: ");
@@ -104,17 +105,18 @@ public class RunCliente {
             case 5: // ANTERIOR OPCIÓN 4
                 verAlertasConfiguradas();
                 break;
-            case 6: // ANTERIOR OPCIÓN 5
+            case 6:
                 eliminarAlertaUsuario();
                 break;
-            case 7: // ANTERIOR OPCIÓN 6
-
+            case 7: // <-- NUEVO CASE
+                modificarAlertaUsuario();
+                break;
+            case 8: // Anterior 7
                 cambiarIdUsuario();
                 break;
-            case 8: // Ayuda
+            case 9: // Anterior 8
                 mostrarAyuda();
                 break;
-
             default:
                 System.out.println(ANSI_RED + "Opción no válida. Intente nuevamente." + ANSI_RESET);
                 break;
@@ -293,5 +295,51 @@ public class RunCliente {
         System.out.println("• Ver alertas: Muestra todas sus alertas configuradas.");
         System.out.println("• Cambiar ID: Permite cambiar su identificador en el sistema.");
         System.out.println("\nSi tiene problemas, contacte al administrador del sistema.");
+    }
+
+    // Dentro de la clase RunCliente
+
+    private static void modificarAlertaUsuario() {
+        System.out.println(ANSI_CYAN + "\n[MODIFICAR ALERTA CONFIGURADA]" + ANSI_RESET);
+        try {
+            // Mostramos las alertas actuales para que el usuario sepa qué ID modificar
+            System.out.println("Tus alertas actuales son:");
+            verAlertasConfiguradas();
+
+            System.out.print("Ingrese el ID de la alerta que desea modificar: ");
+            int idAlerta = obtenerOpcion();
+            if (idAlerta <= 0) {
+                System.out.println(ANSI_RED + "ID no válido." + ANSI_RESET);
+                return;
+            }
+
+            System.out.print("Ingrese el nuevo precio umbral: ");
+            double nuevoPrecio;
+            try {
+                nuevoPrecio = Double.parseDouble(scanner.nextLine().trim());
+                if (nuevoPrecio < 0) throw new NumberFormatException();
+            } catch (NumberFormatException e) {
+                System.out.println(ANSI_RED + "Precio no válido." + ANSI_RESET);
+                return;
+            }
+
+            System.out.print("Seleccione la nueva condición (1: > Mayor que, 2: < Menor que): ");
+            int opcionCondicion = obtenerOpcion();
+            String nuevaCondicion;
+            if (opcionCondicion == 1) {
+                nuevaCondicion = "MAYOR_QUE";
+            } else if (opcionCondicion == 2) {
+                nuevaCondicion = "MENOR_QUE";
+            } else {
+                System.out.println(ANSI_RED + "Condición no válida." + ANSI_RESET);
+                return;
+            }
+
+            String resultado = controlador.modificarAlerta(idAlerta, nuevoPrecio, nuevaCondicion);
+            System.out.println(ANSI_GREEN + resultado + ANSI_RESET);
+
+        } catch (Exception e) {
+            System.out.println(ANSI_RED + "Error al modificar la alerta: " + e.getMessage() + ANSI_RESET);
+        }
     }
 }

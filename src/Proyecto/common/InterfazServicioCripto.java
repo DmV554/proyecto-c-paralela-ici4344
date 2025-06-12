@@ -81,4 +81,18 @@ public interface InterfazServicioCripto extends Remote {
      * @throws RemoteException Si ocurre un error durante la comunicación RMI.
      */
     Map<String, Double> obtenerPreciosDeTodasLasBases(String idUsuario) throws RemoteException; // NUEVO MÉTODO
+
+    // Dentro de la interfaz InterfazServicioCripto
+
+    /**
+     * Modifica una alerta de precio existente para un usuario.
+     *
+     * @param idUsuario      Identificador del usuario propietario de la alerta.
+     * @param idAlertaDB     El ID de la alerta que se desea modificar.
+     * @param nuevoPrecio    El nuevo precio umbral para la alerta.
+     * @param nuevaCondicion La nueva condición ("MAYOR_QUE" o "MENOR_QUE").
+     * @return Un mensaje de confirmación o error.
+     * @throws RemoteException Si ocurre un error durante la comunicación RMI.
+     */
+    String modificarAlerta(String idUsuario, int idAlertaDB, double nuevoPrecio, String nuevaCondicion) throws RemoteException;
 }

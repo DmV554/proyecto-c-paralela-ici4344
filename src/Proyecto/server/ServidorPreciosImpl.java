@@ -645,4 +645,74 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
         System.out.println("[ServidorPreciosImpl] Devolviendo " + preciosDeTodas.size() + " precios para todas las bases (algunos podrían no estar disponibles).");
         return preciosDeTodas;
     }
+
+    // Dentro de la clase ServidorPreciosImpl
+
+    @Override
+    public String modificarAlerta(String nombreUsuario, int idAlertaDB, double nuevoPrecio, String nuevaCondicion) throws RemoteException {
+        if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
+            nombreUsuario = USUARIO_POR_DEFECTO; // Usa el usuario por defecto si no se provee
+        }
+        if (idAlertaDB <= 0 || nuevoPrecio < 0 || (!nuevaCondicion.equalsIgnoreCase("MAYOR_QUE") && !nuevaCondicion.equalsIgnoreCase("MENOR_QUE"))) {
+            throw new RemoteException("Datos para modificar la alerta son inválidos.");
+        }
+
+        System.out.println("[ServidorPreciosImpl] Solicitud para modificar alerta ID: " + idAlertaDB + " para el usuario: " + nombreUsuario);
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        int idUsuarioFk = -1;
+
+        try {
+            conn = DatabaseManager.getConnection();
+            conn.setAutoCommit(false); // Transacción
+
+            // 1. Obtener el id_usuario_fk del usuario (reutilizamos la lógica de eliminar)
+            String sqlGetUsuario = "SELECT id_usuario FROM usuarios WHERE nombre_usuario = ?";
+            pstmt = conn.prepareStatement(sqlGetUsuario);
+            pstmt.setString(1, nombreUsuario);
+            rs = pstmt.executeQuery();
+            if (rs.next()) {
+                idUsuarioFk = rs.getInt("id_usuario");
+            } else {
+                conn.rollback();
+                throw new RemoteException("Usuario '" + nombreUsuario + "' no encontrado.");
+            }
+            rs.close();
+            pstmt.close();
+
+            // 2. Ejecutar el UPDATE, verificando que la alerta pertenece al usuario
+            String sqlUpdate = "UPDATE alertas SET precio_umbral = ?, tipo_condicion = ? WHERE id_alerta = ? AND id_usuario_fk = ?";
+            pstmt = conn.prepareStatement(sqlUpdate);
+            pstmt.setDouble(1, nuevoPrecio);
+            pstmt.setString(2, nuevaCondicion.toUpperCase());
+            pstmt.setInt(3, idAlertaDB);
+            pstmt.setInt(4, idUsuarioFk);
+
+            int affectedRows = pstmt.executeUpdate();
+
+            if (affectedRows > 0) {
+                conn.commit();
+                String mensaje = "Alerta ID: " + idAlertaDB + " modificada correctamente.";
+                System.out.println("[ServidorPreciosImpl] " + mensaje);
+                return mensaje;
+            } else {
+                conn.rollback();
+                // Esto ocurre si el ID de la alerta no existe o no pertenece al usuario
+                throw new RemoteException("No se pudo modificar la alerta. Verifique el ID o la propiedad de la misma.");
+            }
+
+        } catch (SQLException e) {
+            System.err.println("[Servidor ERROR] SQLException al modificar alerta: " + e.getMessage());
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) { /* ignorado */ }
+            }
+            throw new RemoteException("Error de base de datos al modificar la alerta.");
+        } finally {
+            DatabaseManager.close(conn, pstmt, rs);
+        }
+    }
 }
