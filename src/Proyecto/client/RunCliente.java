@@ -1,4 +1,5 @@
 package client;
+
 import java.util.Scanner;
 
 /**
@@ -18,11 +19,11 @@ public class RunCliente {
     private static String idUsuario = "cliente001"; // ID por defecto
 
     public static void main(String[] args) {
-        String host = (args.length < 1) ? "localhost" : args[0];
         imprimirEncabezado();
 
         try {
-            conectarServidor(host);
+            controlador = new TerminalCliente();
+            controlador.conectarConFailover(); // Este método ahora contiene la lógica de failover.
             boolean ejecutar = true;
             while (ejecutar) {
                 mostrarMenu();
@@ -33,17 +34,6 @@ public class RunCliente {
         } catch (Exception e) {
             System.err.println(ANSI_RED + "Error de conexión: " + e.getMessage() + ANSI_RESET);
             // e.printStackTrace(); // Descomentar para depuración detallada
-        }
-    }
-
-    private static void conectarServidor(String host) throws Exception {
-        System.out.println(ANSI_YELLOW + "Conectando al servidor en " + host + "..." + ANSI_RESET);
-        controlador = new TerminalCliente();
-        boolean conectado = controlador.conectar(host, idUsuario);
-        if (conectado) {
-            System.out.println(ANSI_GREEN + "✓ Conexión establecida con éxito" + ANSI_RESET);
-        } else {
-            throw new Exception("No se pudo establecer conexión con el servidor");
         }
     }
 

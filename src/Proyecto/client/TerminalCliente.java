@@ -4,6 +4,7 @@ import common.InterfazServicioCripto;
 
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.rmi.RemoteException;
 import java.util.List;
 import java.util.Map;
 
@@ -17,24 +18,34 @@ public class TerminalCliente {
     private String idUsuario;
     private boolean conectado = false;
 
-    /**
-     * Establece conexión con el servidor RMI
-     *
-     * @param host Host donde se encuentra el servidor RMI
-     * @param idUsuario Identificador del usuario
-     * @return true si la conexión fue exitosa, false en caso contrario
-     */
-    public boolean conectar(String host, String idUsuario) {
+    private static final String HOST_PRINCIPAL = "localhost";
+    private static final int PUERTO_PRINCIPAL = 1099;
+    private static final String SERVICIO_PRINCIPAL = "ServidorCriptoMonitor";
+
+    private static final String HOST_RESPALDO = "localhost";
+    private static final int PUERTO_RESPALDO = 1100;
+    private static final String SERVICIO_RESPALDO = "ServidorCriptoMonitorRespaldo";
+
+
+    // Dentro de la clase TerminalCliente
+    public void conectarConFailover() throws Exception {
         try {
-            Registry registry = LocateRegistry.getRegistry(host, 1099);
-            String serviceName = "ServidorCriptoMonitor";
-            servicio = (InterfazServicioCripto) registry.lookup(serviceName);
-            this.idUsuario = idUsuario;
-            this.conectado = true;
-            return true;
+            System.out.println("Intentando conectar al servidor PRINCIPAL...");
+            Registry registry = LocateRegistry.getRegistry(HOST_PRINCIPAL, PUERTO_PRINCIPAL);
+            this.servicio = (InterfazServicioCripto) registry.lookup(SERVICIO_PRINCIPAL);
+            System.out.println("✓ Conexión establecida con el servidor PRINCIPAL.");
+            return;
         } catch (Exception e) {
-            System.err.println("Error al conectar con el servidor: " + e.getMessage());
-            return false;
+            System.err.println("✘ Falló la conexión con el servidor principal.");
+        }
+
+        try {
+            System.out.println("Intentando conectar al servidor de RESPALDO...");
+            Registry registry = LocateRegistry.getRegistry(HOST_RESPALDO, PUERTO_RESPALDO);
+            this.servicio = (InterfazServicioCripto) registry.lookup(SERVICIO_RESPALDO);
+            System.out.println("✓ Conexión establecida con el servidor de RESPALDO.");
+        } catch (Exception e) {
+            throw new Exception("No hay servidores disponibles. La aplicación no puede continuar.");
         }
     }
 
@@ -54,8 +65,22 @@ public class TerminalCliente {
      * @throws Exception Si ocurre un error al comunicarse con el servidor
      */
     public String obtenerPreciosMonitoreados() throws Exception {
-        verificarConexion();
-        Map<String, Double> precios = servicio.obtenerPreciosMonitoreados(idUsuario);
+        Map<String, Double> precios;
+        try {
+            // 2. PRIMER INTENTO
+            precios = servicio.obtenerPreciosMonitoreados(idUsuario);
+
+        } catch (RemoteException e) {
+            // 3. SI FALLA, RECONECTAR Y REINTENTAR
+            System.err.println("Se perdió la conexión. Intentando reconectar...");
+
+            conectarConFailover(); // Llama al método de reconexión
+
+            System.out.println("Reconexión exitosa. Reintentando la operación...");
+
+            // SEGUNDO INTENTO
+            precios = servicio.obtenerPreciosMonitoreados(idUsuario);
+        }
 
         if (precios.isEmpty()) {
             return "No hay precios (cacheados/monitoreados) disponibles en este momento.";
@@ -87,8 +112,22 @@ public class TerminalCliente {
      * @throws Exception Si ocurre un error al comunicarse con el servidor
      */
     public String obtenerPreciosDeTodasLasBases() throws Exception { // NUEVO MÉTODO
-        verificarConexion();
-        Map<String, Double> precios = servicio.obtenerPreciosDeTodasLasBases(idUsuario);
+        Map<String, Double> precios;
+        try {
+            // 2. PRIMER INTENTO
+            precios = servicio.obtenerPreciosDeTodasLasBases(idUsuario);
+
+        } catch (RemoteException e) {
+            // 3. SI FALLA, RECONECTAR Y REINTENTAR
+            System.err.println("Se perdió la conexión. Intentando reconectar...");
+
+            conectarConFailover(); // Llama al método de reconexión
+
+            System.out.println("Reconexión exitosa. Reintentando la operación...");
+
+            // SEGUNDO INTENTO
+            precios = servicio.obtenerPreciosDeTodasLasBases(idUsuario);
+        }
 
         if (precios.isEmpty()) {
             return "No hay precios de criptomonedas base disponibles o configuradas en el servidor.";
@@ -122,8 +161,22 @@ public class TerminalCliente {
      * @throws Exception Si ocurre un error al comunicarse con el servidor
      */
     public String obtenerPrecioEspecifico(String criptomoneda) throws Exception {
-        verificarConexion();
-        double precio = servicio.obtenerPrecioActual(criptomoneda);
+        double precio;
+        try {
+            // 2. PRIMER INTENTO
+            precio = servicio.obtenerPrecioActual(criptomoneda);
+
+        } catch (RemoteException e) {
+            // 3. SI FALLA, RECONECTAR Y REINTENTAR
+            System.err.println("Se perdió la conexión. Intentando reconectar...");
+
+            conectarConFailover(); // Llama al método de reconexión
+
+            System.out.println("Reconexión exitosa. Reintentando la operación...");
+
+            // SEGUNDO INTENTO
+            precio = servicio.obtenerPrecioActual(criptomoneda);
+        }
 
         if (precio < 0) { // Incluye -1.0 (no encontrado) y -2.0 (error general)
             if (precio == -1.0) {
@@ -147,8 +200,21 @@ public class TerminalCliente {
      */
     public String establecerAlerta(String criptomoneda, double precioUmbral,
                                    String tipoCondicion) throws Exception {
-        verificarConexion();
-        return servicio.establecerAlerta(idUsuario, criptomoneda, precioUmbral, tipoCondicion);
+        try {
+            // 2. PRIMER INTENTO
+            return servicio.establecerAlerta(idUsuario, criptomoneda, precioUmbral, tipoCondicion);
+
+        } catch (RemoteException e) {
+            // 3. SI FALLA, RECONECTAR Y REINTENTAR
+            System.err.println("Se perdió la conexión. Intentando reconectar...");
+
+            conectarConFailover(); // Llama al método de reconexión
+
+            System.out.println("Reconexión exitosa. Reintentando la operación...");
+
+            // SEGUNDO INTENTO
+            return servicio.establecerAlerta(idUsuario, criptomoneda, precioUmbral, tipoCondicion);
+        }
     }
 
     /**
@@ -158,8 +224,24 @@ public class TerminalCliente {
      * @throws Exception Si ocurre un error al comunicarse con el servidor
      */
     public String obtenerAlertasUsuario() throws Exception {
-        verificarConexion();
-        List<String> alertas = servicio.obtenerAlertasUsuario(idUsuario);
+        List<String> alertas;
+
+        try {
+            // --- PRIMER INTENTO ---
+            // Esta es la única línea que puede lanzar una RemoteException
+            alertas = servicio.obtenerAlertasUsuario(idUsuario);
+
+        } catch (RemoteException e) {
+            // Si el primer intento falla, entramos aquí.
+            System.err.println("Se perdió la conexión con el servidor. Intentando reconectar...");
+
+            // Llamamos al método que se encarga de cambiar al servidor de respaldo.
+            conectarConFailover();
+
+            System.out.println("Reconexión exitosa. Reintentando obtener las alertas...");
+
+            alertas = servicio.obtenerAlertasUsuario(idUsuario);
+        }
 
         if (alertas.isEmpty()) {
             return "No tienes alertas configuradas.";
@@ -179,12 +261,6 @@ public class TerminalCliente {
     }
 
     /**
-     * Verifica que exista una conexión con el servidor
-     *
-     * @throws Exception Si no hay conexión establecida
-     */
-
-    /**
      * Solicita al servidor eliminar una alerta específica.
      *
      * @param idAlertaDB El ID de la alerta en la base de datos a eliminar.
@@ -192,14 +268,20 @@ public class TerminalCliente {
      * @throws Exception Si ocurre un error al comunicarse con el servidor.
      */
     public String eliminarAlerta(int idAlertaDB) throws Exception {
-        verificarConexion();
-        return servicio.eliminarAlerta(idUsuario, idAlertaDB);
-    }
+        try {
+            // 2. PRIMER INTENTO
+            return servicio.eliminarAlerta(idUsuario, idAlertaDB);
 
+        } catch (RemoteException e) {
+            // 3. SI FALLA, RECONECTAR Y REINTENTAR
+            System.err.println("Se perdió la conexión. Intentando reconectar...");
 
-    private void verificarConexion() throws Exception {
-        if (!conectado || servicio == null) {
-            throw new Exception("No hay conexión con el servidor.");
+            conectarConFailover(); // Llama al método de reconexión
+
+            System.out.println("Reconexión exitosa. Reintentando la operación...");
+
+            // SEGUNDO INTENTO
+            return servicio.eliminarAlerta(idUsuario, idAlertaDB);
         }
     }
 
