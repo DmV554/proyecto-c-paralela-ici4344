@@ -296,4 +296,19 @@ public class TerminalCliente {
         System.out.println("Este método está obsoleto. Por favor, utilice RunCliente como punto de entrada.");
         RunCliente.main(args);
     }
+    // Dentro de la clase TerminalCliente
+
+    /**
+     * Solicita al servidor modificar una alerta existente.
+     *
+     * @param idAlertaDB El ID de la alerta a modificar.
+     * @param nuevoPrecio El nuevo precio umbral.
+     * @param nuevaCondicion La nueva condición.
+     * @return Mensaje de confirmación del servidor.
+     * @throws Exception Si hay un error.
+     */
+    public String modificarAlerta(int idAlertaDB, double nuevoPrecio, String nuevaCondicion) throws Exception {
+        verificarConexion();
+        return servicio.modificarAlerta(idUsuario, idAlertaDB, nuevoPrecio, nuevaCondicion);
+    }
 }

@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
+// Arriba de la clase ServidorPreciosImpl, junto a las otras variables
 public class ServidorPreciosImpl extends UnicastRemoteObject implements InterfazServicioCripto {
 
     private final CoinGeckoService coinGeckoService;
@@ -27,6 +27,34 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
     private static final String USUARIO_POR_DEFECTO = "default_user";
 
     private final Map<String, Cripto> cacheCriptoData = new ConcurrentHashMap<>();
+
+    // ▼▼▼ AÑADIR ESTA LÍNEA ▼▼▼
+    // Este será nuestro "candado" para las operaciones críticas en la base de datos.
+    // El 'true' activa un modo "justo", donde los hilos que esperan obtienen el bloqueo
+    // en el orden en que lo solicitaron.
+    // AÑADIR ESTA LÍNEA:
+    private boolean inUse = false;
+
+    // AÑADIR ESTOS DOS MÉTODOS:
+
+    /**
+     * Solicita el acceso exclusivo al recurso. (Estilo-Clase)
+     * @return true si se obtiene el bloqueo, false si está ocupado.
+     */
+    public synchronized boolean request_mutex() {
+        if (inUse) {
+            return false; // El recurso está ocupado
+        }
+        this.inUse = true; // Tomamos el bloqueo
+        return true;       // Acceso concedido
+    }
+
+    /**
+     * Libera el recurso para que otros puedan usarlo. (Estilo-Clase)
+     */
+    public synchronized void release_mutex() {
+        this.inUse = false; // Liberamos el bloqueo
+    }
 
     private static class AlertaDefinicion {
         String idAlertaDB;
@@ -309,181 +337,246 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
 
     @Override
     public String establecerAlerta(String nombreUsuario, String criptomoneda, double precioUmbral, String tipoCondicion) throws RemoteException {
-        if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
-            nombreUsuario = USUARIO_POR_DEFECTO;
-            System.out.println("[ServidorPreciosImpl] Nombre de usuario no provisto para alerta, usando por defecto: " + USUARIO_POR_DEFECTO);
-        }
-        if (criptomoneda == null || criptomoneda.trim().isEmpty() ||
-                (!tipoCondicion.equalsIgnoreCase("MAYOR_QUE") && !tipoCondicion.equalsIgnoreCase("MENOR_QUE"))) {
-            throw new RemoteException("Datos de alerta inválidos: Criptomoneda y tipo de condición ('MAYOR_QUE' o 'MENOR_QUE') son obligatorios.");
-        }
-        String criptoUpper = criptomoneda.toUpperCase();
-        String tipoCondicionUpper = tipoCondicion.toUpperCase();
 
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
+        System.out.println("\n[Mutex] Hilo " + Thread.currentThread().getName() + " intentando adquirir bloqueo para ESTABLECER ALERTA...");
+
+        // 1. Bucle de espera para adquirir el bloqueo (estilo-clase)
+        while (!this.request_mutex()) {
+            System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " en espera. El recurso está ocupado.");
+            try {
+                // CORREGIDO: Pausa corta de 2 segundos para la espera.
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        // Si salimos del bucle, es porque obtuvimos el bloqueo.
+        System.out.println("[Mutex] ¡Bloqueo adquirido por " + Thread.currentThread().getName() + "! Iniciando operación crítica.");
+
+        // 2. Bloque try-finally para garantizar la liberación del mutex
         try {
-            conn = DatabaseManager.getConnection();
-            conn.setAutoCommit(false);
+            // --- INICIO DE LA ZONA CRÍTICA ---
+            // (Aquí va toda tu lógica original de base de datos)
+            if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
+                nombreUsuario = USUARIO_POR_DEFECTO;
+                System.out.println("[ServidorPreciosImpl] Nombre de usuario no provisto para alerta, usando por defecto: " + USUARIO_POR_DEFECTO);
+            }
+            if (criptomoneda == null || criptomoneda.trim().isEmpty() ||
+                    (!tipoCondicion.equalsIgnoreCase("MAYOR_QUE") && !tipoCondicion.equalsIgnoreCase("MENOR_QUE"))) {
+                throw new RemoteException("Datos de alerta inválidos: Criptomoneda y tipo de condición ('MAYOR_QUE' o 'MENOR_QUE') son obligatorios.");
+            }
+            String criptoUpper = criptomoneda.toUpperCase();
+            String tipoCondicionUpper = tipoCondicion.toUpperCase();
 
-            int idUsuarioFk = -1;
-            String sqlGetUsuario = "SELECT id_usuario FROM usuarios WHERE nombre_usuario = ?";
-            pstmt = conn.prepareStatement(sqlGetUsuario);
-            pstmt.setString(1, nombreUsuario);
-            rs = pstmt.executeQuery();
-            if (rs.next()) {
-                idUsuarioFk = rs.getInt("id_usuario");
-            } else {
-                rs.close();
-                pstmt.close();
-                String sqlInsertUsuario = "INSERT INTO usuarios (nombre_usuario) VALUES (?)";
-                pstmt = conn.prepareStatement(sqlInsertUsuario, Statement.RETURN_GENERATED_KEYS);
+            Connection conn = null;
+            PreparedStatement pstmt = null;
+            ResultSet rs = null;
+            try {
+                conn = DatabaseManager.getConnection();
+                conn.setAutoCommit(false);
+
+                int idUsuarioFk = -1;
+                String sqlGetUsuario = "SELECT id_usuario FROM usuarios WHERE nombre_usuario = ?";
+                pstmt = conn.prepareStatement(sqlGetUsuario);
                 pstmt.setString(1, nombreUsuario);
-                pstmt.executeUpdate();
-                rs = pstmt.getGeneratedKeys();
+                rs = pstmt.executeQuery();
                 if (rs.next()) {
-                    idUsuarioFk = rs.getInt(1);
-                    System.out.println("[ServidorPreciosImpl] Usuario '" + nombreUsuario + "' creado con ID: " + idUsuarioFk);
+                    idUsuarioFk = rs.getInt("id_usuario");
+                } else {
+                    rs.close();
+                    pstmt.close();
+                    String sqlInsertUsuario = "INSERT INTO usuarios (nombre_usuario) VALUES (?)";
+                    pstmt = conn.prepareStatement(sqlInsertUsuario, Statement.RETURN_GENERATED_KEYS);
+                    pstmt.setString(1, nombreUsuario);
+                    pstmt.executeUpdate();
+                    rs = pstmt.getGeneratedKeys();
+                    if (rs.next()) {
+                        idUsuarioFk = rs.getInt(1);
+                        System.out.println("[ServidorPreciosImpl] Usuario '" + nombreUsuario + "' creado con ID: " + idUsuarioFk);
+                    } else {
+                        conn.rollback();
+                        throw new RemoteException("No se pudo crear el usuario '" + nombreUsuario + "' en la base de datos.");
+                    }
+                }
+                if(rs!=null) rs.close();
+                if(pstmt!=null) pstmt.close();
+
+                int idCriptoFk = -1;
+                String sqlGetCripto = "SELECT id_cripto FROM criptomonedas WHERE simbolo = ?";
+                pstmt = conn.prepareStatement(sqlGetCripto);
+                pstmt.setString(1, criptoUpper);
+                rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    idCriptoFk = rs.getInt("id_cripto");
                 } else {
                     conn.rollback();
-                    throw new RemoteException("No se pudo crear el usuario '" + nombreUsuario + "' en la base de datos.");
+                    throw new RemoteException("Criptomoneda '" + criptoUpper + "' no encontrada en la base de datos.");
                 }
-            }
-            if(rs!=null) rs.close();
-            if(pstmt!=null) pstmt.close();
+                rs.close();
+                pstmt.close();
 
-            int idCriptoFk = -1;
-            String sqlGetCripto = "SELECT id_cripto FROM criptomonedas WHERE simbolo = ?";
-            pstmt = conn.prepareStatement(sqlGetCripto);
-            pstmt.setString(1, criptoUpper);
-            rs = pstmt.executeQuery();
-            if (rs.next()) {
-                idCriptoFk = rs.getInt("id_cripto");
-            } else {
-                conn.rollback();
-                throw new RemoteException("Criptomoneda '" + criptoUpper + "' no encontrada en la base de datos. Asegúrate que esté en la lista de criptomonedas monitoreadas/conocidas.");
-            }
-            rs.close();
-            pstmt.close();
+                String sqlInsertAlerta = "INSERT INTO alertas (id_usuario_fk, id_cripto_fk, precio_umbral, tipo_condicion, activa) VALUES (?, ?, ?, ?, TRUE)";
+                pstmt = conn.prepareStatement(sqlInsertAlerta);
+                pstmt.setInt(1, idUsuarioFk);
+                pstmt.setInt(2, idCriptoFk);
+                pstmt.setDouble(3, precioUmbral);
+                pstmt.setString(4, tipoCondicionUpper);
+                int affectedRows = pstmt.executeUpdate();
 
-            String sqlInsertAlerta = "INSERT INTO alertas (id_usuario_fk, id_cripto_fk, precio_umbral, tipo_condicion, activa) VALUES (?, ?, ?, ?, TRUE)";
-            pstmt = conn.prepareStatement(sqlInsertAlerta);
-            pstmt.setInt(1, idUsuarioFk);
-            pstmt.setInt(2, idCriptoFk);
-            pstmt.setDouble(3, precioUmbral);
-            pstmt.setString(4, tipoCondicionUpper);
-            int affectedRows = pstmt.executeUpdate();
+                if (affectedRows > 0) {
+                    conn.commit();
 
-            if (affectedRows > 0) {
-                conn.commit();
-                AlertaDefinicion nuevaAlerta = new AlertaDefinicion(nombreUsuario, criptoUpper, precioUmbral, tipoCondicionUpper);
-                String mensaje = "Alerta para " + nuevaAlerta.toString().replace("(Activa: true)","") + " establecida correctamente para el usuario " + nombreUsuario + ".";
-                System.out.printf("[ServidorPreciosImpl] %s\n", mensaje);
-                return mensaje;
-            } else {
-                conn.rollback();
-                throw new RemoteException("No se pudo establecer la alerta en la base de datos.");
-            }
+                    // --- CÓDIGO SOLO PARA DEMOSTRACIÓN (CORREGIDO) ---
+                    System.out.println("-> [Servidor] Procesando solicitud para " + Thread.currentThread().getName() + ". La operación simulada tomará 8 segundos...");
+                    try {
+                        // CORREGIDO: Pausa larga de 8 segundos para la demostración.
+                        Thread.sleep(8000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    System.out.println("-> [Servidor] Procesamiento para " + Thread.currentThread().getName() + " finalizado.");
+                    // --- FIN CÓDIGO DEMO ---
 
-        } catch (SQLException e) {
-            System.err.println("[Servidor ERROR] SQLException al establecer alerta: " + e.getMessage());
-            if (conn != null) {
-                try {
+                    AlertaDefinicion nuevaAlerta = new AlertaDefinicion(nombreUsuario, criptoUpper, precioUmbral, tipoCondicionUpper);
+                    String mensaje = "Alerta para " + nuevaAlerta.toString().replace("(Activa: true)","") + " establecida correctamente para el usuario " + nombreUsuario + ".";
+                    System.out.printf("[ServidorPreciosImpl] %s\n", mensaje);
+                    return mensaje;
+                } else {
                     conn.rollback();
-                } catch (SQLException ex) {
-                    System.err.println("[Servidor ERROR] Error en rollback de alerta: " + ex.getMessage());
+                    throw new RemoteException("No se pudo establecer la alerta en la base de datos.");
                 }
+
+            } catch (SQLException e) {
+                System.err.println("[Servidor ERROR] SQLException al establecer alerta: " + e.getMessage());
+                if (conn != null) {
+                    try {
+                        conn.rollback();
+                    } catch (SQLException ex) {
+                        System.err.println("[Servidor ERROR] Error en rollback de alerta: " + ex.getMessage());
+                    }
+                }
+                throw new RemoteException("Error de base de datos al establecer alerta: " + e.getMessage());
+            } finally {
+                if(conn != null) {
+                    try {
+                        conn.setAutoCommit(true);
+                    } catch (SQLException e) { /* ignored */ }
+                }
+                DatabaseManager.close(conn, pstmt, rs);
             }
-            throw new RemoteException("Error de base de datos al establecer alerta: " + e.getMessage());
+            // --- FIN DE LA ZONA CRÍTICA ---
         } finally {
-            if(conn != null) {
-                try {
-                    conn.setAutoCommit(true); // Restaurar autocommit por si acaso
-                } catch (SQLException e) { /* ignored */ }
-            }
-            DatabaseManager.close(conn, pstmt, rs); // pstmt y rs ya deberían estar cerrados por los bloques anteriores
+            // 3. Se libera el bloqueo SIEMPRE, sin importar si hubo éxito o error
+            System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " liberando el bloqueo.");
+            this.release_mutex();
         }
     }
 
     @Override
     public String eliminarAlerta(String nombreUsuario, int idAlertaDB) throws RemoteException {
-        if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
-            nombreUsuario = USUARIO_POR_DEFECTO;
-            System.out.println("[ServidorPreciosImpl] Nombre de usuario no provisto para eliminar alerta, usando por defecto: " + USUARIO_POR_DEFECTO);
+
+        System.out.println("\n[Mutex] Hilo " + Thread.currentThread().getName() + " intentando adquirir bloqueo para ELIMINAR ALERTA...");
+
+        // 1. Bucle de espera para adquirir el bloqueo (estilo-clase)
+        while (!this.request_mutex()) {
+            System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " en espera. El recurso está ocupado.");
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
-        if (idAlertaDB <= 0) {
-            throw new RemoteException("ID de alerta inválido.");
-        }
 
-        System.out.println("[ServidorPreciosImpl] Solicitud para eliminar alerta ID: " + idAlertaDB + " para el usuario: " + nombreUsuario);
+        System.out.println("[Mutex] ¡Bloqueo adquirido por " + Thread.currentThread().getName() + "! Iniciando operación crítica.");
 
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
-        int idUsuarioFk = -1;
-
+        // 2. Bloque try-finally para garantizar la liberación del mutex
         try {
-            conn = DatabaseManager.getConnection();
-            conn.setAutoCommit(false); // Iniciar transacción
+            // --- INICIO DE LA ZONA CRÍTICA ---
+            // (Aquí va toda tu lógica original de base de datos)
 
-            // 1. Obtener el id_usuario_fk del usuario
-            String sqlGetUsuario = "SELECT id_usuario FROM usuarios WHERE nombre_usuario = ?";
-            pstmt = conn.prepareStatement(sqlGetUsuario);
-            pstmt.setString(1, nombreUsuario);
-            rs = pstmt.executeQuery();
-            if (rs.next()) {
-                idUsuarioFk = rs.getInt("id_usuario");
-            } else {
-                conn.rollback();
-                // Aunque podríamos crearlo, para eliminar una alerta el usuario ya debería existir y tener esa alerta.
-                throw new RemoteException("Usuario '" + nombreUsuario + "' no encontrado. No se puede eliminar la alerta.");
+            if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
+                nombreUsuario = USUARIO_POR_DEFECTO;
+                System.out.println("[ServidorPreciosImpl] Nombre de usuario no provisto para eliminar alerta, usando por defecto: " + USUARIO_POR_DEFECTO);
             }
-            rs.close();
-            pstmt.close();
+            if (idAlertaDB <= 0) {
+                throw new RemoteException("ID de alerta inválido.");
+            }
 
-            // 2. Eliminar la alerta verificando que pertenezca al usuario
-            String sqlDeleteAlerta = "DELETE FROM alertas WHERE id_alerta = ? AND id_usuario_fk = ?";
-            pstmt = conn.prepareStatement(sqlDeleteAlerta);
-            pstmt.setInt(1, idAlertaDB);
-            pstmt.setInt(2, idUsuarioFk);
+            System.out.println("[ServidorPreciosImpl] Solicitud para eliminar alerta ID: " + idAlertaDB + " para el usuario: " + nombreUsuario);
 
-            int affectedRows = pstmt.executeUpdate();
+            Connection conn = null;
+            PreparedStatement pstmt = null;
+            ResultSet rs = null;
+            int idUsuarioFk = -1;
 
-            if (affectedRows > 0) {
-                conn.commit();
-                String mensaje = "Alerta ID: " + idAlertaDB + " eliminada correctamente para el usuario " + nombreUsuario + ".";
-                System.out.println("[ServidorPreciosImpl] " + mensaje);
-                return mensaje;
-            } else {
-                conn.rollback();
-                // Verificar si la alerta existía pero no pertenecía al usuario, o si no existía.
-                String sqlCheckAlertaExiste = "SELECT id_usuario_fk FROM alertas WHERE id_alerta = ?";
-                PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheckAlertaExiste);
-                pstmtCheck.setInt(1, idAlertaDB);
-                ResultSet rsCheck = pstmtCheck.executeQuery();
-                boolean alertaExiste = rsCheck.next();
-                rsCheck.close();
-                pstmtCheck.close();
+            try {
+                conn = DatabaseManager.getConnection();
+                conn.setAutoCommit(false); // Iniciar transacción
 
-                if (alertaExiste) {
-                    throw new RemoteException("La alerta ID: " + idAlertaDB + " no pertenece al usuario " + nombreUsuario + " o ya fue eliminada.");
+                // 1. Obtener el id_usuario_fk del usuario
+                String sqlGetUsuario = "SELECT id_usuario FROM usuarios WHERE nombre_usuario = ?";
+                pstmt = conn.prepareStatement(sqlGetUsuario);
+                pstmt.setString(1, nombreUsuario);
+                rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    idUsuarioFk = rs.getInt("id_usuario");
                 } else {
-                    throw new RemoteException("Alerta ID: " + idAlertaDB + " no encontrada.");
-                }
-            }
-        } catch (SQLException e) {
-            System.err.println("[Servidor ERROR] SQLException al eliminar alerta: " + e.getMessage());
-            if (conn != null) {
-                try {
                     conn.rollback();
-                } catch (SQLException ex) {
-                    System.err.println("[Servidor ERROR] Error en rollback al eliminar alerta: " + ex.getMessage());
+                    throw new RemoteException("Usuario '" + nombreUsuario + "' no encontrado. No se puede eliminar la alerta.");
                 }
+                rs.close();
+                pstmt.close();
+
+                // 2. Eliminar la alerta verificando que pertenezca al usuario
+                String sqlDeleteAlerta = "DELETE FROM alertas WHERE id_alerta = ? AND id_usuario_fk = ?";
+                pstmt = conn.prepareStatement(sqlDeleteAlerta);
+                pstmt.setInt(1, idAlertaDB);
+                pstmt.setInt(2, idUsuarioFk);
+
+                int affectedRows = pstmt.executeUpdate();
+
+                if (affectedRows > 0) {
+                    conn.commit();
+                    String mensaje = "Alerta ID: " + idAlertaDB + " eliminada correctamente para el usuario " + nombreUsuario + ".";
+                    System.out.println("[ServidorPreciosImpl] " + mensaje);
+                    return mensaje;
+                } else {
+                    conn.rollback();
+                    // Verificar si la alerta existía pero no pertenecía al usuario, o si no existía.
+                    String sqlCheckAlertaExiste = "SELECT id_usuario_fk FROM alertas WHERE id_alerta = ?";
+                    PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheckAlertaExiste);
+                    pstmtCheck.setInt(1, idAlertaDB);
+                    ResultSet rsCheck = pstmtCheck.executeQuery();
+                    boolean alertaExiste = rsCheck.next();
+                    rsCheck.close();
+                    pstmtCheck.close();
+
+                    if (alertaExiste) {
+                        throw new RemoteException("La alerta ID: " + idAlertaDB + " no pertenece al usuario " + nombreUsuario + " o ya fue eliminada.");
+                    } else {
+                        throw new RemoteException("Alerta ID: " + idAlertaDB + " no encontrada.");
+                    }
+                }
+            } catch (SQLException e) {
+                System.err.println("[Servidor ERROR] SQLException al eliminar alerta: " + e.getMessage());
+                if (conn != null) {
+                    try {
+                        conn.rollback();
+                    } catch (SQLException ex) {
+                        System.err.println("[Servidor ERROR] Error en rollback al eliminar alerta: " + ex.getMessage());
+                    }
+                }
+                throw new RemoteException("Error de base de datos al eliminar alerta: " + e.getMessage());
+            } finally {
+                DatabaseManager.close(conn, pstmt, rs);
             }
-            throw new RemoteException("Error de base de datos al eliminar alerta: " + e.getMessage());
+
+            // --- FIN DE LA ZONA CRÍTICA ---
         } finally {
-            DatabaseManager.close(conn, pstmt, rs); // rs ya estaría cerrado si se usó
+            // 3. Se libera el bloqueo SIEMPRE, sin importar si hubo éxito o error
+            System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " liberando el bloqueo.");
+            this.release_mutex();
         }
     }
 
@@ -644,5 +737,99 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
         }
         System.out.println("[ServidorPreciosImpl] Devolviendo " + preciosDeTodas.size() + " precios para todas las bases (algunos podrían no estar disponibles).");
         return preciosDeTodas;
+    }
+
+    // Dentro de la clase ServidorPreciosImpl
+
+    @Override
+    public String modificarAlerta(String nombreUsuario, int idAlertaDB, double nuevoPrecio, String nuevaCondicion) throws RemoteException {
+
+        System.out.println("\n[Mutex] Hilo " + Thread.currentThread().getName() + " intentando adquirir bloqueo para MODIFICAR ALERTA...");
+
+        // 1. Bucle de espera para adquirir el bloqueo (estilo-clase)
+        while (!this.request_mutex()) {
+            System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " en espera. El recurso está ocupado.");
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        System.out.println("[Mutex] ¡Bloqueo adquirido por " + Thread.currentThread().getName() + "! Iniciando operación crítica.");
+
+        // 2. Bloque try-finally para garantizar la liberación del mutex
+        try {
+            // --- INICIO DE LA ZONA CRÍTICA ---
+            // (Aquí va toda tu lógica original de base de datos)
+
+            if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
+                nombreUsuario = USUARIO_POR_DEFECTO;
+            }
+            if (idAlertaDB <= 0 || nuevoPrecio < 0 || (!nuevaCondicion.equalsIgnoreCase("MAYOR_QUE") && !nuevaCondicion.equalsIgnoreCase("MENOR_QUE"))) {
+                throw new RemoteException("Datos para modificar la alerta son inválidos.");
+            }
+            System.out.println("[ServidorPreciosImpl] Solicitud para modificar alerta ID: " + idAlertaDB + " para el usuario: " + nombreUsuario);
+
+            Connection conn = null;
+            PreparedStatement pstmt = null;
+            ResultSet rs = null;
+            int idUsuarioFk = -1;
+
+            try {
+                conn = DatabaseManager.getConnection();
+                conn.setAutoCommit(false);
+
+                // Obtener el id_usuario_fk
+                String sqlGetUsuario = "SELECT id_usuario FROM usuarios WHERE nombre_usuario = ?";
+                pstmt = conn.prepareStatement(sqlGetUsuario);
+                pstmt.setString(1, nombreUsuario);
+                rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    idUsuarioFk = rs.getInt("id_usuario");
+                } else {
+                    conn.rollback();
+                    throw new RemoteException("Usuario '" + nombreUsuario + "' no encontrado.");
+                }
+                rs.close();
+                pstmt.close();
+
+                // Ejecutar el UPDATE
+                String sqlUpdate = "UPDATE alertas SET precio_umbral = ?, tipo_condicion = ? WHERE id_alerta = ? AND id_usuario_fk = ?";
+                pstmt = conn.prepareStatement(sqlUpdate);
+                pstmt.setDouble(1, nuevoPrecio);
+                pstmt.setString(2, nuevaCondicion.toUpperCase());
+                pstmt.setInt(3, idAlertaDB);
+                pstmt.setInt(4, idUsuarioFk);
+                int affectedRows = pstmt.executeUpdate();
+
+                if (affectedRows > 0) {
+                    conn.commit();
+                    String mensaje = "Alerta ID: " + idAlertaDB + " modificada correctamente.";
+                    System.out.println("[ServidorPreciosImpl] " + mensaje);
+                    return mensaje;
+                } else {
+                    conn.rollback();
+                    throw new RemoteException("No se pudo modificar la alerta. Verifique el ID o la propiedad de la misma.");
+                }
+
+            } catch (SQLException e) {
+                System.err.println("[Servidor ERROR] SQLException al modificar alerta: " + e.getMessage());
+                if (conn != null) {
+                    try {
+                        conn.rollback();
+                    } catch (SQLException ex) { /* ignorado */ }
+                }
+                throw new RemoteException("Error de base de datos al modificar la alerta.");
+            } finally {
+                DatabaseManager.close(conn, pstmt, rs);
+            }
+
+            // --- FIN DE LA ZONA CRÍTICA ---
+        } finally {
+            // 3. Se libera el bloqueo SIEMPRE, sin importar si hubo éxito o error
+            System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " liberando el bloqueo.");
+            this.release_mutex();
+        }
     }
 }
