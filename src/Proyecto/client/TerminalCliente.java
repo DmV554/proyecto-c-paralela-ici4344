@@ -308,7 +308,20 @@ public class TerminalCliente {
      * @throws Exception Si hay un error.
      */
     public String modificarAlerta(int idAlertaDB, double nuevoPrecio, String nuevaCondicion) throws Exception {
-        verificarConexion();
-        return servicio.modificarAlerta(idUsuario, idAlertaDB, nuevoPrecio, nuevaCondicion);
+        try {
+            // 2. PRIMER INTENTO
+            return servicio.modificarAlerta(idUsuario, idAlertaDB, nuevoPrecio, nuevaCondicion);
+
+        } catch (RemoteException e) {
+            // 3. SI FALLA, RECONECTAR Y REINTENTAR
+            System.err.println("Se perdió la conexión. Intentando reconectar...");
+
+            conectarConFailover(); // Llama al método de reconexión
+
+            System.out.println("Reconexión exitosa. Reintentando la operación...");
+
+            // SEGUNDO INTENTO
+            return servicio.modificarAlerta(idUsuario, idAlertaDB, nuevoPrecio, nuevaCondicion);
+        }
     }
 }
