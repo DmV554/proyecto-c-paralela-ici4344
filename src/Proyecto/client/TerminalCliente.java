@@ -14,6 +14,8 @@ import java.util.Map;
  * y la lógica de negocio del servidor.
  */
 public class TerminalCliente {
+    private static final String ANSI_RESET = "\u001B[0m";
+    private static final String ANSI_RED = "\u001B[31m";
     private InterfazServicioCripto servicio;
     private String idUsuario;
     private boolean conectado = false;
@@ -36,7 +38,7 @@ public class TerminalCliente {
             System.out.println("✓ Conexión establecida con el servidor PRINCIPAL.");
             return;
         } catch (Exception e) {
-            System.err.println("✘ Falló la conexión con el servidor principal.");
+            System.out.println(ANSI_RED + "✘ Falló la conexión con el servidor principal." + ANSI_RESET);
         }
 
         try {
@@ -45,6 +47,7 @@ public class TerminalCliente {
             this.servicio = (InterfazServicioCripto) registry.lookup(SERVICIO_RESPALDO);
             System.out.println("✓ Conexión establecida con el servidor de RESPALDO.");
         } catch (Exception e) {
+            System.out.println(ANSI_RED + "✘ Falló la conexión con el servidor de respaldo." + ANSI_RESET);
             throw new Exception("No hay servidores disponibles. La aplicación no puede continuar.");
         }
     }
