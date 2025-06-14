@@ -28,14 +28,8 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
 
     private final Map<String, Cripto> cacheCriptoData = new ConcurrentHashMap<>();
 
-    // ▼▼▼ AÑADIR ESTA LÍNEA ▼▼▼
-    // Este será nuestro "candado" para las operaciones críticas en la base de datos.
-    // El 'true' activa un modo "justo", donde los hilos que esperan obtienen el bloqueo
-    // en el orden en que lo solicitaron.
-    // AÑADIR ESTA LÍNEA:
-    private boolean inUse = false;
 
-    // AÑADIR ESTOS DOS MÉTODOS:
+    private boolean inUse = false;
 
     /**
      * Solicita el acceso exclusivo al recurso. (Estilo-Clase)
@@ -62,7 +56,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
         String criptomoneda;
         double precioUmbral;
         String tipoCondicion;
-        boolean activa = true; // Esta 'activa' es del objeto, la BD tiene la suya
+        boolean activa = true;
 
         public AlertaDefinicion(String idAlertaDB, String idUsuario, String criptomoneda, double precioUmbral, String tipoCondicion, boolean activa) {
             this.idAlertaDB = idAlertaDB;
@@ -464,7 +458,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                 DatabaseManager.close(conn, pstmt, rs);
             }
         } finally {
-            // 3. Se libera el bloqueo SIEMPRE, sin importar si hubo éxito o error
+
             System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " liberando el bloqueo.");
             this.release_mutex();
         }
@@ -549,7 +543,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                     return mensaje;
                 } else {
                     conn.rollback();
-                    // Verificar si la alerta existía pero no pertenecía al usuario, o si no existía.
+                    // Verificar si la alerta existía pero no pertenecía al usuario, o si no existía
                     String sqlCheckAlertaExiste = "SELECT id_usuario_fk FROM alertas WHERE id_alerta = ?";
                     PreparedStatement pstmtCheck = conn.prepareStatement(sqlCheckAlertaExiste);
                     pstmtCheck.setInt(1, idAlertaDB);
@@ -579,7 +573,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
             }
 
         } finally {
-            // 3. Se libera el bloqueo SIEMPRE, sin importar si hubo éxito o error
+
             System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " liberando el bloqueo.");
             this.release_mutex();
         }
@@ -637,16 +631,12 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
             throw new RemoteException("Nombre de criptomoneda no puede ser nulo o vacío.");
         }
         String criptoUpper = criptomoneda.toUpperCase();
-        // System.out.println("[ServidorPreciosImpl] Solicitud de precio para: " + criptoUpper);
 
         Cripto criptoEnCache = cacheCriptoData.get(criptoUpper);
         if (criptoEnCache != null && (System.currentTimeMillis() - criptoEnCache.getUltimaActualizacionTimestamp() < (INTERVALO_ACTUALIZACION_PRECIOS_SEGUNDOS * 1000 / 2))) {
-            // System.out.printf("[ServidorPreciosImpl] Precio para %s (desde caché reciente): %.2f USD (Actualizado: %tF %<tT)\n",
-            //         criptoUpper, criptoEnCache.getPrecioUSD(), new Date(criptoEnCache.getUltimaActualizacionTimestamp()));
             return criptoEnCache.getPrecioUSD();
         }
 
-        // System.out.println("[ServidorPreciosImpl] Precio para " + criptoUpper + " no en caché o desactualizado. Intentando obtener desde API...");
         try {
             Cripto criptoObtenida = coinGeckoService.fetchSingleCriptoData(criptoUpper, MONEDA_COTIZACION);
             if (criptoObtenida != null) {
@@ -654,16 +644,12 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                 singleCriptoMap.put(criptoUpper, criptoObtenida);
                 actualizarCacheYGuardarHistorial(singleCriptoMap);
 
-                // System.out.printf("[ServidorPreciosImpl] Precio para %s (obtenido de API y cacheado/historial): %.2f USD (Actualizado: %tF %<tT)\n",
-                //         criptoUpper, criptoObtenida.getPrecioUSD(), new Date(criptoObtenida.getUltimaActualizacionTimestamp()));
                 return criptoObtenida.getPrecioUSD();
             } else {
-                // System.out.println("[ServidorPreciosImpl] No se pudo obtener precio para " + criptoUpper + " desde la API. Intentando último precio conocido de BD.");
                 return obtenerUltimoPrecioConocidoDeDB(criptoUpper);
             }
         } catch (IOException e) {
             System.err.println("[ServidorPreciosImpl ERROR] IOException al obtener precio individual para " + criptoUpper + ": " + e.getMessage());
-            // System.out.println("[ServidorPreciosImpl] Intentando último precio conocido de BD para " + criptoUpper + " debido a error de API.");
             return obtenerUltimoPrecioConocidoDeDB(criptoUpper);
         }
     }
@@ -682,10 +668,8 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
             rs = pstmt.executeQuery();
             if (rs.next()) {
                 double precio = rs.getDouble("precio");
-                // System.out.println("[ServidorPreciosImpl] Último precio desde BD para " + criptoSimbol + ": " + precio);
                 return precio;
             } else {
-                // System.out.println("[ServidorPreciosImpl] No se encontró último precio en BD para " + criptoSimbol);
                 return -1.0;
             }
         } catch (SQLException e) {
@@ -724,8 +708,6 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
 
         for (String simbolo : todosLosSimbolosBase) {
             try {
-                // Reutiliza la lógica existente que maneja caché, API, e historial DB
-                // Esta llamada es interna al objeto, no una llamada RMI aquí.
                 double precio = obtenerPrecioActual(simbolo);
                 if (precio >= 0) { // obtenerPrecioActual devuelve < 0 si no se encuentra o hay error
                     preciosDeTodas.put(simbolo, precio);
@@ -734,8 +716,6 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                     System.out.println("[ServidorPreciosImpl] No se pudo obtener precio para la cripto base: " + simbolo + " en obtenerPreciosDeTodasLasBases (valor: "+precio+").");
                 }
             } catch (RemoteException e) {
-                // Aunque es llamada local, obtenerPrecioActual está en la interfaz RMI y declara RemoteException.
-                // Esto es más para cuando el cliente lo llama. Internamente, las IOException de la API son más probables.
                 System.err.println("[ServidorPreciosImpl ERROR] Excepción al intentar obtener precio para " + simbolo + " en obtenerPreciosDeTodasLasBases: " + e.getMessage());
                 preciosDeTodas.put(simbolo, -2.0); // Usar un valor diferente para error de obtención general
             }

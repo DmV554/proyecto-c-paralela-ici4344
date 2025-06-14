@@ -25,7 +25,7 @@ public class RunServer {
             System.out.println("Instancia de ServidorPreciosImpl creada.");
 
             // 3. Registrar (bind) el objeto remoto en el RMI Registry
-            // El cliente usará este nombre para buscar el servicio.
+            // El cliente usará este nombre para buscar el servicio
             String serviceName = "ServidorCriptoMonitor"; // Nuevo nombre para el servicio
             registry.rebind(serviceName, cryptoService);
 

@@ -23,7 +23,7 @@ public class RunCliente {
 
         try {
             controlador = new TerminalCliente();
-            controlador.conectarConFailover(); // Este método ahora contiene la lógica de failover.
+            controlador.conectarConFailover();
             boolean ejecutar = true;
             while (ejecutar) {
                 mostrarMenu();
@@ -45,7 +45,6 @@ public class RunCliente {
     }
 
     private static void mostrarMenu() {
-        // Usaremos los mismos colores y formato que tenías, adaptados al nuevo menú.
         System.out.println(ANSI_CYAN + "\n╔═══════════════ MENÚ PRINCIPAL ════════════════╗" + ANSI_RESET);
         System.out.println("  1. Ver precios de criptomonedas (general)");
         System.out.println("  2. Ver precios de criptomonedas (buscadas anteriormente)");
@@ -80,31 +79,31 @@ public class RunCliente {
                 System.out.println(ANSI_YELLOW + "Cerrando aplicación..." + ANSI_RESET);
                 return false;
 
-            case 1: // NUEVA OPCIÓN
+            case 1:
                 verPreciosGenerales();
                 break;
-            case 2: // ANTERIOR OPCIÓN 1
+            case 2:
                 verPreciosBuscadosAnteriormente();
                 break;
-            case 3: // ANTERIOR OPCIÓN 2
+            case 3:
                 consultarPrecioEspecifico();
                 break;
-            case 4: // ANTERIOR OPCIÓN 3
+            case 4:
                 configurarAlerta();
                 break;
-            case 5: // ANTERIOR OPCIÓN 4
+            case 5:
                 verAlertasConfiguradas();
                 break;
             case 6:
                 eliminarAlertaUsuario();
                 break;
-            case 7: // <-- NUEVO CASE
+            case 7:
                 modificarAlertaUsuario();
                 break;
-            case 8: // Anterior 7
+            case 8:
                 cambiarIdUsuario();
                 break;
-            case 9: // Anterior 8
+            case 9:
                 mostrarAyuda();
                 break;
             default:
@@ -116,7 +115,7 @@ public class RunCliente {
         return true;
     }
 
-    // NUEVO MÉTODO
+
     private static void verPreciosGenerales() {
         System.out.println(ANSI_CYAN + "\n[PRECIOS DE CRIPTOMONEDAS - GENERAL]" + ANSI_RESET);
         try {
@@ -128,7 +127,7 @@ public class RunCliente {
     }
 
     // MÉTODO RENOMBRADO Y MODIFICADO EL TÍTULO
-    private static void verPreciosBuscadosAnteriormente() { // Renamed from verPreciosActuales
+    private static void verPreciosBuscadosAnteriormente() {
         System.out.println(ANSI_CYAN + "\n[PRECIOS DE CRIPTOMONEDAS - BUSCADAS ANTERIORMENTE/CACHE]" + ANSI_RESET);
         try {
             String resultado = controlador.obtenerPreciosMonitoreados(); // Llama al mismo método en TerminalCliente
@@ -165,7 +164,7 @@ public class RunCliente {
             }
 
             System.out.print("Seleccione condición (1: > Mayor que, 2: < Menor que): ");
-            // String condicionStr = scanner.nextLine().trim(); // Esto se maneja con obtenerOpcion()
+
             int condicionInt = obtenerOpcion(); // Usar el método seguro
 
             String tipoCondicion;
