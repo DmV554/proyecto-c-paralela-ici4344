@@ -425,7 +425,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                 if (affectedRows > 0) {
                     conn.commit();
 
-                    // --- CÓDIGO SOLO PARA DEMOSTRACIÓN (CORREGIDO) ---
+                    // --- CÓDIGO SOLO PARA DEMOSTRACIÓN ---
                     System.out.println("-> [Servidor] Procesando solicitud para " + Thread.currentThread().getName() + ". La operación simulada tomará 8 segundos...");
                     try {
                         // CORREGIDO: Pausa larga de 8 segundos para la demostración.
