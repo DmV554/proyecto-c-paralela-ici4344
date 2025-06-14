@@ -344,7 +344,6 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
         while (!this.request_mutex()) {
             System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " en espera. El recurso está ocupado.");
             try {
-                // CORREGIDO: Pausa corta de 2 segundos para la espera.
                 Thread.sleep(2000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -356,8 +355,7 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
 
         // 2. Bloque try-finally para garantizar la liberación del mutex
         try {
-            // --- INICIO DE LA ZONA CRÍTICA ---
-            // (Aquí va toda tu lógica original de base de datos)
+
             if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
                 nombreUsuario = USUARIO_POR_DEFECTO;
                 System.out.println("[ServidorPreciosImpl] Nombre de usuario no provisto para alerta, usando por defecto: " + USUARIO_POR_DEFECTO);
@@ -465,7 +463,6 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                 }
                 DatabaseManager.close(conn, pstmt, rs);
             }
-            // --- FIN DE LA ZONA CRÍTICA ---
         } finally {
             // 3. Se libera el bloqueo SIEMPRE, sin importar si hubo éxito o error
             System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " liberando el bloqueo.");
@@ -492,9 +489,6 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
 
         // 2. Bloque try-finally para garantizar la liberación del mutex
         try {
-            // --- INICIO DE LA ZONA CRÍTICA ---
-            // (Aquí va toda tu lógica original de base de datos)
-
             if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
                 nombreUsuario = USUARIO_POR_DEFECTO;
                 System.out.println("[ServidorPreciosImpl] Nombre de usuario no provisto para eliminar alerta, usando por defecto: " + USUARIO_POR_DEFECTO);
@@ -538,6 +532,18 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
 
                 if (affectedRows > 0) {
                     conn.commit();
+
+                    // --- CÓDIGO SOLO PARA DEMOSTRACIÓN ---
+                    System.out.println("-> [Servidor] Procesando solicitud para " + Thread.currentThread().getName() + ". La operación simulada tomará 8 segundos...");
+                    try {
+                        // Pausa larga de 8 segundos para la demostración.
+                        Thread.sleep(8000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    System.out.println("-> [Servidor] Procesamiento para " + Thread.currentThread().getName() + " finalizado.");
+                    // --- FIN CÓDIGO DEMO ---
+
                     String mensaje = "Alerta ID: " + idAlertaDB + " eliminada correctamente para el usuario " + nombreUsuario + ".";
                     System.out.println("[ServidorPreciosImpl] " + mensaje);
                     return mensaje;
@@ -572,7 +578,6 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                 DatabaseManager.close(conn, pstmt, rs);
             }
 
-            // --- FIN DE LA ZONA CRÍTICA ---
         } finally {
             // 3. Se libera el bloqueo SIEMPRE, sin importar si hubo éxito o error
             System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " liberando el bloqueo.");
@@ -760,9 +765,6 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
 
         // 2. Bloque try-finally para garantizar la liberación del mutex
         try {
-            // --- INICIO DE LA ZONA CRÍTICA ---
-            // (Aquí va toda tu lógica original de base de datos)
-
             if (nombreUsuario == null || nombreUsuario.trim().isEmpty()) {
                 nombreUsuario = USUARIO_POR_DEFECTO;
             }
@@ -805,6 +807,18 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
 
                 if (affectedRows > 0) {
                     conn.commit();
+
+                    // --- CÓDIGO SOLO PARA DEMOSTRACIÓN ---
+                    System.out.println("-> [Servidor] Procesando solicitud para " + Thread.currentThread().getName() + ". La operación simulada tomará 8 segundos...");
+                    try {
+                        // Pausa larga de 8 segundos para la demostración.
+                        Thread.sleep(8000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    System.out.println("-> [Servidor] Procesamiento para " + Thread.currentThread().getName() + " finalizado.");
+                    // --- FIN CÓDIGO DEMO ---
+
                     String mensaje = "Alerta ID: " + idAlertaDB + " modificada correctamente.";
                     System.out.println("[ServidorPreciosImpl] " + mensaje);
                     return mensaje;
@@ -825,7 +839,6 @@ public class ServidorPreciosImpl extends UnicastRemoteObject implements Interfaz
                 DatabaseManager.close(conn, pstmt, rs);
             }
 
-            // --- FIN DE LA ZONA CRÍTICA ---
         } finally {
             // 3. Se libera el bloqueo SIEMPRE, sin importar si hubo éxito o error
             System.out.println("[Mutex] Hilo " + Thread.currentThread().getName() + " liberando el bloqueo.");
